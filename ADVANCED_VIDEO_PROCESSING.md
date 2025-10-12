@@ -40,7 +40,24 @@ VIDEO_CLIP_DURATION=30
 
 # Segundos de offset desde el inicio (default: 10)
 VIDEO_CLIP_START_OFFSET=10
+
+# Limpiar archivos temporales después del procesamiento (default: true)
+VIDEO_CLEANUP_FILES=true
 ```
+
+### Configurar Limpieza de Archivos
+
+Por defecto, el sistema limpia automáticamente los archivos temporales después del procesamiento para ahorrar espacio. Puedes controlar este comportamiento:
+
+```bash
+# Habilitar limpieza automática (recomendado)
+VIDEO_CLEANUP_FILES=true
+
+# Deshabilitar limpieza (mantener archivos originales y clips)
+VIDEO_CLEANUP_FILES=false
+```
+
+**Nota**: Si deshabilitas la limpieza, los archivos se acumularán en el directorio de descargas. Asegúrate de tener suficiente espacio disponible.
 
 ## Ejemplo de Uso
 
@@ -73,6 +90,22 @@ Cada procesamiento genera un ID único y métricas detalladas:
 [video_123_1634567890] Paso 5: Borrando mensajes relacionados
 [video_123_1634567890] Paso 5 completado en 0.45s
 [video_123_1634567890] Proceso finalizado. Success: True, Duration: 60.60s
+```
+
+### Con Limpieza Deshabilitada (`VIDEO_CLEANUP_FILES=false`)
+
+```
+[video_456_1634567990] Iniciando procesamiento de video largo
+[video_456_1634567990] Paso 1: Descargando video largo
+[video_456_1634567990] Paso 1 completado en 35.12s
+[video_456_1634567990] Paso 2: Creando clip corto
+[video_456_1634567990] Paso 2 completado en 8.75s
+[video_456_1634567990] Paso 3: Reenviando clip
+[video_456_1634567990] Paso 3 completado en 1.95s
+[video_456_1634567990] Paso 4: Limpieza de archivos deshabilitada por configuración
+[video_456_1634567990] Paso 5: Borrando mensajes relacionados
+[video_456_1634567990] Paso 5 completado en 0.38s
+[video_456_1634567990] Proceso finalizado. Success: True, Duration: 46.20s
 ```
 
 ## Notificaciones
