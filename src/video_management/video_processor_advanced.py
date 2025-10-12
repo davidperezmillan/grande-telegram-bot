@@ -1,6 +1,8 @@
 import os
 import time
 import asyncio
+import json
+import random
 from datetime import datetime
 from pathlib import Path
 from src.utils.logger import get_logger
@@ -31,12 +33,17 @@ class AdvancedVideoProcessor:
         
         # Configuración de recorte (configurable por variables de entorno)
         self.clip_duration = int(os.getenv('VIDEO_CLIP_DURATION', '30'))  # segundos
-        self.clip_start_offset = int(os.getenv('VIDEO_CLIP_START_OFFSET', '10'))  # empezar después de X segundos
+        
+        # Obtener offset de inicio (puede estar vacío para inicio aleatorio)
+        start_offset_env = os.getenv('VIDEO_CLIP_START_OFFSET', '')
+        self.clip_start_offset = int(start_offset_env) if start_offset_env.strip() else None
+        self.use_random_start = self.clip_start_offset is None
         
         # Métricas de tiempo
         self.metrics = {}
         
-        self.logger.info(f"AdvancedVideoProcessor inicializado - Clip: {self.clip_duration}s desde {self.clip_start_offset}s")
+        start_info = "aleatorio" if self.use_random_start else f"{self.clip_start_offset}s"
+        self.logger.info(f"AdvancedVideoProcessor inicializado - Clip: {self.clip_duration}s desde {start_info}")
         
     async def process_long_video(self, message, file_info, reason, message_data):
         """
@@ -211,12 +218,29 @@ class AdvancedVideoProcessor:
         step_start = time.time()
         
         try:
+            # Determinar el tiempo de inicio del clip
+            actual_start_offset = self.clip_start_offset
+            start_info = f"{actual_start_offset}s"
+            
+            if self.use_random_start:
+                # Obtener duración del video para calcular inicio aleatorio
+                video_duration = await self._get_video_duration(video_path)
+                
+                if video_duration is not None:
+                    actual_start_offset = self._calculate_random_start_time(video_duration)
+                    start_info = f"{actual_start_offset}s (aleatorio de {video_duration:.1f}s total)"
+                else:
+                    # Fallback: usar un offset fijo si no se puede obtener la duración
+                    actual_start_offset = 10
+                    start_info = f"{actual_start_offset}s (fallback, no se pudo obtener duración)"
+                    self.logger.warning(f"[{process_id}] No se pudo obtener duración del video, usando offset fijo")
+            
             # Notificar inicio de recorte
             await self.notification_manager.send_notification(
                 chat_id=self.notification_manager.bot_owner_id,
                 message=f"✂️ **Paso 2/5**: Recortando video...\n"
                        f"⏱️ **Duración clip**: {self.clip_duration}s\n"
-                       f"▶️ **Inicio**: {self.clip_start_offset}s",
+                       f"▶️ **Inicio**: {start_info}",
                 parse_mode='markdown'
             )
             
@@ -224,8 +248,8 @@ class AdvancedVideoProcessor:
             video_file = Path(video_path)
             clip_path = video_file.parent / f"clip_{video_file.stem}.mp4"
             
-            # Crear clip usando ffmpeg
-            await self._create_video_clip(video_path, str(clip_path))
+            # Crear clip usando ffmpeg con el offset calculado
+            await self._create_video_clip(video_path, str(clip_path), actual_start_offset)
             
             # Verificar que el clip se creó correctamente
             if not clip_path.exists():
@@ -243,7 +267,9 @@ class AdvancedVideoProcessor:
                 'success': True,
                 'clip_path': str(clip_path),
                 'clip_size': clip_size,
-                'clip_duration': self.clip_duration
+                'clip_duration': self.clip_duration,
+                'start_offset': actual_start_offset,
+                'random_start': self.use_random_start
             }
             
             self.logger.info(f"[{process_id}] Paso 2 completado en {step_duration:.2f}s")
@@ -492,16 +518,26 @@ class AdvancedVideoProcessor:
                 'duration': step_duration
             }
     
-    async def _create_video_clip(self, input_path, output_path):
+    async def _create_video_clip(self, input_path, output_path, start_offset=None):
         """
-        Crear un clip de video usando ffmpeg
+        Crear clip de video usando ffmpeg
+        
+        Args:
+            input_path (str): Ruta del video original
+            output_path (str): Ruta donde guardar el clip
+            start_offset (int, optional): Tiempo de inicio en segundos. Si es None, usa self.clip_start_offset
         """
         try:
+            # Usar el offset proporcionado o el configurado por defecto
+            actual_start_offset = start_offset if start_offset is not None else self.clip_start_offset
+            
+            self.logger.info(f"Creando clip: {input_path} -> {output_path} (inicio: {actual_start_offset}s, duración: {self.clip_duration}s)")
+            
             # Ejecutar ffmpeg de forma asíncrona
             process = await asyncio.create_subprocess_exec(
                 'ffmpeg',
                 '-i', input_path,
-                '-ss', str(self.clip_start_offset),  # Tiempo de inicio
+                '-ss', str(actual_start_offset),     # Tiempo de inicio
                 '-t', str(self.clip_duration),       # Duración del clip
                 '-c:v', 'libx264',                   # Codec de video
                 '-c:a', 'aac',                       # Codec de audio
@@ -561,3 +597,71 @@ class AdvancedVideoProcessor:
         self.logger.info(f"[{process_id}] Proceso finalizado. Success: {success}, Duration: {total_duration:.2f}s")
         
         return result
+    
+    async def _get_video_duration(self, video_path):
+        """
+        Obtener la duración del video en segundos usando ffprobe
+        
+        Args:
+            video_path (str): Ruta al archivo de video
+            
+        Returns:
+            float: Duración del video en segundos, o None si hay error
+        """
+        try:
+            process = await asyncio.create_subprocess_exec(
+                'ffprobe',
+                '-v', 'quiet',
+                '-show_entries', 'format=duration',
+                '-of', 'json',
+                video_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                self.logger.error(f"Error ejecutando ffprobe: {stderr.decode()}")
+                return None
+                
+            # Parsear la salida JSON
+            result = json.loads(stdout.decode())
+            duration = float(result['format']['duration'])
+            
+            self.logger.info(f"Duración del video detectada: {duration:.2f}s")
+            return duration
+            
+        except Exception as e:
+            self.logger.error(f"Error obteniendo duración del video: {e}")
+            return None
+    
+    def _calculate_random_start_time(self, video_duration):
+        """
+        Calcular un tiempo de inicio aleatorio para el clip
+        
+        Args:
+            video_duration (float): Duración total del video en segundos
+            
+        Returns:
+            int: Tiempo de inicio en segundos
+        """
+        if video_duration <= self.clip_duration:
+            # Si el video es más corto que el clip deseado, empezar desde el inicio
+            return 0
+        
+        # Calcular el rango válido para el inicio del clip
+        # Dejar un margen al final para que el clip completo quepa
+        max_start_time = int(video_duration - self.clip_duration)
+        
+        # Asegurar que tenemos al menos 5 segundos de margen al inicio
+        min_start_time = min(5, max_start_time)
+        
+        if max_start_time <= min_start_time:
+            return min_start_time
+        
+        # Generar tiempo aleatorio
+        random_start = random.randint(min_start_time, max_start_time)
+        
+        self.logger.info(f"Tiempo de inicio aleatorio calculado: {random_start}s (rango: {min_start_time}-{max_start_time}s)")
+        return random_start
