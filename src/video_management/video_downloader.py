@@ -16,7 +16,7 @@ class VideoDownloader:
     
     async def download_video(self, message, file_info, reason, message_data):
         """
-        Manejar el proceso completo de descarga de video
+        Manejar el proceso completo de descarga de video largo
         
         Args:
             message: Mensaje de Telegram con el video
@@ -27,20 +27,7 @@ class VideoDownloader:
         Returns:
             str: Resultado de la operación de descarga
         """
-    
-        resp_download = await self.__download_long_video(message, file_info, reason, message_data)
-
-        resp_extract =await self.__extract_short_video(message, file_info, reason, message_data)
-
-        # si tenemos respuesta de descarga y extraccion devolvemos ambas en un string
-        if resp_download and resp_extract:
-            return f"{resp_download} | {resp_extract}"
-        elif resp_download:
-            return resp_download
-        elif resp_extract:
-            return resp_extract
-        else:
-            return "No se pudo procesar el video"
+        return await self.__download_long_video(message, file_info, reason, message_data)
 
     # metodo para descargar videos largos con metrica
     async def __download_long_video(self, message, file_info, reason, message_data):
@@ -123,47 +110,7 @@ class VideoDownloader:
             return f"video largo descargado - {reason}"
         else:
             return f"error descargando video largo - {reason}"
-        
-    async def __extract_short_video(self, message, file_info, reason, message_data):
-        """
-        Manejar el proceso completo de extracción y reenvío de video corto
-
-        Args:
-            message: Mensaje de Telegram con el video
-            file_info: Información del archivo de video
-            reason: Razón por la cual se debe extraer y reenviar
-            message_data: Diccionario para almacenar datos del mensaje
-
-        Returns:
-            str: Resultado de la operación de extracción y reenvío
-        """
-        self.log_info(f"Extrayendo y reenviando video corto: {reason}")
-
-        # Enviar notificación de inicio de extracción y reenvío
-        await self.notification_manager.send_extraction_start_notification(
-            chat_id=message.chat_id,
-            message_id=message.id,
-            file_info={
-                'type': 'video',
-                'size': file_info['file_size'],
-                'name': file_info.get('file_name', f'video_{message.id}')
-            },
-            reply_to_message_id=message.id
-        )
-
-        # Reenviar video al chat privado
-        forward_result = await self.notification_manager.forward_video_to_private_chat(
-            message,
-            file_info
-        )
-
-        if forward_result['success']:
-            message_data['forwarded_message_id'] = forward_result['forwarded_message_id']
-            return f"video corto reenviado - {reason}"
-        else:
-            return f"error reenviando video corto - {reason}"
     
-
     def log_info(self, message):
         """Helper para logging"""
         self.logger.info(message)
