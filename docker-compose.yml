@@ -12,7 +12,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./downloads:/app/downloads
+      - ${DOWNLOAD_DIR}:/app/downloads
     networks:
       - grande-bot-net
 
