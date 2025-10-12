@@ -53,11 +53,16 @@ class AdvancedVideoProcessor:
         
         self.use_random_start = self.clip_start_offset is None
         
+        # Configuración de limpieza de archivos
+        cleanup_files_env = os.getenv('VIDEO_CLEANUP_FILES', 'true').strip().lower()
+        self.cleanup_files = cleanup_files_env in ['true', '1', 'yes', 'on']
+        
         # Métricas de tiempo
         self.metrics = {}
         
         start_info = "aleatorio" if self.use_random_start else f"{self.clip_start_offset}s"
-        self.logger.info(f"AdvancedVideoProcessor inicializado - Clip: {self.clip_duration}s desde {start_info}")
+        cleanup_info = "habilitada" if self.cleanup_files else "deshabilitada"
+        self.logger.info(f"AdvancedVideoProcessor inicializado - Clip: {self.clip_duration}s desde {start_info}, Limpieza: {cleanup_info}")
         
     async def process_long_video(self, message, file_info, reason, message_data):
         """
@@ -106,10 +111,21 @@ class AdvancedVideoProcessor:
                 process_id, message, clip_result['clip_path'], file_info
             )
             
-            # Paso 4: Limpiar archivos temporales
-            cleanup_result = await self._step_4_cleanup_files(
-                process_id, [download_result['file_path'], clip_result['clip_path']]
-            )
+            # Paso 4: Limpiar archivos temporales (condicional)
+            cleanup_result = {'success': True, 'skipped': True}  # Default para cuando se omite
+            if self.cleanup_files:
+                cleanup_result = await self._step_4_cleanup_files(
+                    process_id, [download_result['file_path'], clip_result['clip_path']]
+                )
+            else:
+                self.logger.info(f"[{process_id}] Paso 4: Limpieza de archivos deshabilitada por configuración")
+                # Registrar paso omitido en métricas
+                self.metrics[process_id]['steps']['cleanup_files'] = {
+                    'duration': 0,
+                    'success': True,
+                    'skipped': True,
+                    'reason': 'Disabled by VIDEO_CLEANUP_FILES setting'
+                }
             
             # Paso 5: Borrar mensajes relacionados
             delete_result = await self._step_5_delete_messages(
@@ -126,6 +142,7 @@ class AdvancedVideoProcessor:
                 'steps_completed': 5,
                 'forward_success': forward_result['success'],
                 'cleanup_success': cleanup_result['success'],
+                'cleanup_skipped': cleanup_result.get('skipped', False),
                 'delete_success': delete_result['success'],
                 'metrics': self.metrics[process_id]
             }
@@ -592,8 +609,13 @@ class AdvancedVideoProcessor:
         # Detalles de pasos
         report += "📋 **Detalles de pasos**:\n"
         for step_name, step_data in self.metrics[process_id]['steps'].items():
-            step_emoji = "✅" if step_data['success'] else "❌"
-            report += f"{step_emoji} {step_name}: {step_data['duration']:.2f}s\n"
+            if step_data.get('skipped', False):
+                step_emoji = "⏭️"
+                step_info = f"{step_name}: Omitido ({step_data.get('reason', 'N/A')})"
+            else:
+                step_emoji = "✅" if step_data['success'] else "❌"
+                step_info = f"{step_name}: {step_data['duration']:.2f}s"
+            report += f"{step_emoji} {step_info}\n"
         
         # Errores si los hay
         if self.metrics[process_id]['errors']:
