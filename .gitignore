@@ -1,0 +1,59 @@
+# Ignorar archivos de sesión de Telethon
+*.session
+*.session-journal
+
+# Ignorar variables de entorno reales
+.env
+
+# Ignorar archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ignorar archivos de logs
+logs/
+*.log
+
+# Ignorar base de datos
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignorar archivos descargados
+downloads/
+
+# Ignorar archivos de Docker
+.dockerignore
+
+# Ignorar archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignorar archivos temporales
+tmp/
+temp/
