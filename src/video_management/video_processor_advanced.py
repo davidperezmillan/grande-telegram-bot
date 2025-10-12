@@ -277,7 +277,7 @@ class AdvancedVideoProcessor:
             
             # Generar nombre para el clip
             video_file = Path(video_path)
-            clip_path = video_file.parent / f"clips/clip_{video_file.stem}.mp4"
+            clip_path = video_file.parent / f"clips/{video_file.stem}.mp4"
             
             # Crear clip usando ffmpeg con el offset calculado
             await self._create_video_clip(video_path, str(clip_path), actual_start_offset)
