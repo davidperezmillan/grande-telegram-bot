@@ -32,11 +32,25 @@ class AdvancedVideoProcessor:
         self.logger = logger
         
         # Configuración de recorte (configurable por variables de entorno)
-        self.clip_duration = int(os.getenv('VIDEO_CLIP_DURATION', '30'))  # segundos
+        try:
+            self.clip_duration = int(os.getenv('VIDEO_CLIP_DURATION', '30'))  # segundos
+        except ValueError:
+            self.logger.warning(f"Valor inválido para VIDEO_CLIP_DURATION. Usando valor por defecto: 30 segundos.")
+            self.clip_duration = 30
         
         # Obtener offset de inicio (puede estar vacío para inicio aleatorio)
-        start_offset_env = os.getenv('VIDEO_CLIP_START_OFFSET', '')
-        self.clip_start_offset = int(start_offset_env) if start_offset_env.strip() else None
+        start_offset_env = os.getenv('VIDEO_CLIP_START_OFFSET', '').strip()
+        self.clip_start_offset = None
+        
+        # Validar que el offset sea un número válido
+        if start_offset_env:
+            try:
+                # Ignorar líneas que empiecen con # (comentarios)
+                if not start_offset_env.startswith('#'):
+                    self.clip_start_offset = int(start_offset_env)
+            except ValueError:
+                self.logger.warning(f"Valor inválido para VIDEO_CLIP_START_OFFSET: '{start_offset_env}'. Usando inicio aleatorio.")
+        
         self.use_random_start = self.clip_start_offset is None
         
         # Métricas de tiempo
