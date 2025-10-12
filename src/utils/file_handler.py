@@ -14,6 +14,8 @@ class FileHandler:
         
         # Crear directorio de descargas si no existe
         os.makedirs(self.download_dir, exist_ok=True)
+        # Crear subdirectorio para clips si no existe
+        os.makedirs(os.path.join(self.download_dir, 'clips'), exist_ok=True)
     
     def get_file_info(self, message):
         """Obtener información del archivo en el mensaje"""
