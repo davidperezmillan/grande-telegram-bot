@@ -1,0 +1,21 @@
+services:
+  grande-bot:
+    build: .
+    container_name: grande_bot
+    restart: unless-stopped
+    environment:
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - TARGET_GROUP_ID=${TARGET_GROUP_ID}
+      - TARGET_GROUP_USERNAME=${TARGET_GROUP_USERNAME}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./downloads:/app/downloads
+    networks:
+      - grande-bot-net
+
+networks:
+  grande-bot-net:
+    driver: bridge
