@@ -1,10 +1,10 @@
 import os
 import shutil
-from src.config.logger import Logger
+from src.config.logger import setup_logger
 
 class FileManager:
     def __init__(self):
-        self.logger = Logger.setup_logger('FileManager')
+        self.logger = setup_logger('FileManager')
         self.persist_dir = os.path.join('downloads', 'persist')
         self._ensure_dirs()
 

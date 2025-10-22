@@ -1,12 +1,12 @@
 from telethon import events
-from src.config.logger import Logger
+from src.config.logger import setup_logger
 from src.utils.message_info import MessageInfo
 
 class CommandHandler:
     def __init__(self, client, config):
         self.client = client
         self.config = config
-        self.logger = Logger.setup_logger('CommandHandler')
+        self.logger = setup_logger('CommandHandler')
 
     def register_commands(self):
         """Registra los comandos del bot."""

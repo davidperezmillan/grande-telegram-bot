@@ -6,6 +6,8 @@ class Config:
         self.api_id = int(os.getenv('API_ID'))
         self.api_hash = os.getenv('API_HASH')
         self.user_id = int(os.getenv('USER_ID'))
+
+        self.logs_level = os.getenv('LOGS_LEVEL', 'INFO')
         
         # Validar que todas las variables estén presentes
         if not all([self.bot_token, self.api_id, self.api_hash, self.user_id]):
