@@ -1,10 +1,10 @@
-from src.config.logger import Logger
+from src.config.logger import setup_logger
 
 class TelegramMessenger:
     def __init__(self, client, config):
         self.client = client
         self.config = config
-        self.logger = Logger.setup_logger('TelegramMessenger')
+        self.logger = setup_logger('TelegramMessenger')
 
     async def send_notification_to_me(self, text, parse_mode=None):
         self.logger.info(f"Sending notification to user {self.config.user_id}: {text}")

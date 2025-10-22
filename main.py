@@ -4,11 +4,15 @@ from dotenv import load_dotenv
 from telethon import TelegramClient
 from src.config.config import Config
 from src.handlers.handler_registry import HandlerRegistry
+from src.config.logger import setup_logger
 
 # Cargar variables de entorno
 load_dotenv()
 
 async def main():
+    logger = setup_logger('Main')
+    logger.info("Iniciando bot...")
+    
     config = Config()
     
     client = TelegramClient('bot', config.api_id, config.api_hash)
@@ -18,6 +22,7 @@ async def main():
     handler_registry = HandlerRegistry(client, config)
     handler_registry.register_all_handlers()
     
+    logger.info("Bot iniciado correctamente")
     print("Bot iniciado correctamente")
     await client.run_until_disconnected()
 

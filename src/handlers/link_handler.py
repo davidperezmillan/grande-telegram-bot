@@ -1,7 +1,7 @@
 import os
 import re
 from telethon import events, Button
-from src.config.logger import Logger
+from src.config.logger import setup_logger
 from src.telegram.telegram_messenger import TelegramMessenger
 from src.utils.file_manager import FileManager
 from src.database.manager import DatabaseManager
@@ -12,7 +12,7 @@ class LinkHandler:
     def __init__(self, client, config):
         self.client = client
         self.config = config
-        self.logger = Logger.setup_logger('LinkHandler')
+        self.logger = setup_logger('LinkHandler')
         self.messenger = TelegramMessenger(client, config)
         self.file_manager = FileManager()
         self.db_manager = DatabaseManager()
