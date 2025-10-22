@@ -1,6 +1,6 @@
 import os
 import re
-from telethon import events
+from telethon import events, Button
 from src.config.logger import Logger
 from src.telegram.telegram_messenger import TelegramMessenger
 from src.utils.file_manager import FileManager
@@ -33,6 +33,33 @@ class LinkHandler:
             except Exception as e:
                 self.logger.error(f"Error handling link message: {e}")
 
+        @self.client.on(events.CallbackQuery)
+        async def handle_callback(event):
+            """Handle callback queries from inline buttons."""
+            try:
+                data = event.data.decode('utf-8')
+                if data.startswith('persist:'):
+                    filename = data.split(':', 1)[1]
+                    filepath = os.path.join('downloads', filename)
+                    if self.file_manager.persist_file(filepath):
+                        await event.answer("✅ Archivo persistido correctamente")
+                        await event.edit("", buttons=None)
+                    else:
+                        await event.answer("❌ Error al persistir archivo")
+                elif data.startswith('delete:'):
+                    filename = data.split(':', 1)[1]
+                    filepath = os.path.join('downloads', filename)
+                    if self.file_manager.delete_file(filepath):
+                        await event.answer("🗑️ Archivo eliminado correctamente")
+                        await event.edit("", buttons=None)
+                    else:
+                        await event.answer("❌ Error al eliminar archivo")
+                else:
+                    await event.answer("Acción desconocida")
+            except Exception as e:
+                self.logger.error(f"Error handling callback: {e}")
+                await event.answer("❌ Error procesando acción")
+
 
     def _extract_all_links(self, text):
         """Extract all URLs from text."""
@@ -47,18 +74,19 @@ class LinkHandler:
                 f"Descargando video de: {link}", parse_mode='md')
 
             try:
-                # Obtener información del usuario que solicita
-                msg_info = MessageInfo(message)
-                sender = msg_info.get_sender_info()
-                user_info = f"👤 Usuario: {sender['first_name'] or 'Unknown'}"
-                if sender['username']:
-                    user_info += f" (@{sender['username']})"
-                user_info += f" - ID: `{sender['id']}`"
-                user_info += f"\n📍 Chat: `{msg_info.get_chat_id()}` ({msg_info.get_chat_type()})"
-                
-                # Notificar al usuario
-                notification = f"🎥 **Nueva descarga solicitada**\n\n{user_info}\n\n🔗 Link: {link}"
-                await self.messenger.send_notification_to_me(notification, parse_mode='md')
+                if (self.config.user_id != message.chat_id):
+                    # Obtener información del usuario que solicita
+                    msg_info = MessageInfo(message)
+                    sender = msg_info.get_sender_info()
+                    user_info = f"👤 Usuario: {sender['first_name'] or 'Unknown'}"
+                    if sender['username']:
+                        user_info += f" (@{sender['username']})"
+                    user_info += f" - ID: `{sender['id']}`"
+                    user_info += f"\n📍 Chat: `{msg_info.get_chat_id()}` ({msg_info.get_chat_type()})"
+                    
+                    # Notificar al usuario
+                    notification = f"🎥 **Nueva descarga solicitada**\n\n{user_info}\n\n🔗 Link: {link}"
+                    await self.messenger.send_notification_to_me(notification, parse_mode='md')
             except Exception as e:
                 self.logger.error(f"Error notifying user: {e}")
 
@@ -81,26 +109,30 @@ class LinkHandler:
             ## editar proccess_msg
             await self.messenger.delete_message(message.id, chat_id=message.chat_id)
             await self.messenger.delete_message(proccess_msg.id, chat_id=proccess_msg.chat_id)
-            proccess_msg = await self.messenger.send_message(message.chat_id,
-                f"Video descargado: {filename}", parse_mode='md')
+            
+            # Crear botones inline
+            buttons = [
+                [Button.inline("💾 Persistir", f"persist:{os.path.basename(filename)}"),
+                Button.inline("🗑️ Borrar", f"delete:{os.path.basename(filename)}")]
+            ]
 
-            ## enviar video al chat de origen
+            ## enviar video al chat de origen con botones
             await self.client.send_file(
                 message.chat_id,
                 filename,
+                caption=f"Video descargado de:\n{link}\n\nElige qué hacer con el archivo:",
                 parse_mode='markdown',
                 supports_streaming=True,
-                spoiler=True
+                spoiler=True,
+                buttons=buttons
             )
-            # borrar proccess_msg
-            await self.messenger.delete_message(proccess_msg)
 
-            ## borrar archivo descargado
-            os.remove(filename)
-            self.logger.info(f"Archivo {filename} eliminado después de enviar.")
+            # No borrar el archivo aquí, lo harán los botones
 
-            # Optionally, process like a video
-            # But for now, just download
+        except Exception as e:
+            error_msg = f"Error descargando video de: {str(e)}"
+            self.logger.error(f"Error downloading video: {e}")
+            await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
 
         except Exception as e:
             error_msg = f"Error descargando video de: {str(e)}"
