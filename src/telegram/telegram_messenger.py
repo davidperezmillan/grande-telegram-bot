@@ -16,8 +16,13 @@ class TelegramMessenger:
         message = await self.client.send_message(chat_id, text, parse_mode=parse_mode)
         return message
 
+    async def edit_message(self, message, new_text, parse_mode=None):
+        self.logger.info(f"Editing message {message.id} in chat {message.chat_id}: {new_text}")
+        edited_message = await self.client.edit_message(message.chat_id, message.id, new_text, parse_mode=parse_mode)
+        return edited_message
+
     async def delete_message(self, message_or_id, chat_id=None):
-        if hasattr(message_or_id, 'id'):
+        if hasattr(message_or_id, 'id') and hasattr(message_or_id, 'chat_id'):
             await self.client.delete_messages(message_or_id.chat_id, message_or_id.id)
         else:
             if chat_id is None:
