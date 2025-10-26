@@ -106,9 +106,7 @@ class LinkHandler:
 
             self.logger.info(f"Downloaded: {filename}")
             
-            ## editar proccess_msg
-            await self.messenger.delete_message(message.id, chat_id=message.chat_id)
-            await self.messenger.delete_message(proccess_msg.id, chat_id=proccess_msg.chat_id)
+
             
             # Crear botones inline
             buttons = [
