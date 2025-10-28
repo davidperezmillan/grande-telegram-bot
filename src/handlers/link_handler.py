@@ -90,6 +90,16 @@ class LinkHandler:
             except Exception as e:
                 self.logger.error(f"Error notifying user: {e}")
 
+            try:
+                # recuperar info del mensaje, media_id	access_hash
+                msg_info = MessageInfo(message)
+                media_id = msg_info.get_media_id()
+                access_hash = msg_info.get_access_hash()
+            except Exception as e:
+                self.logger.error(f"Error retrieving media info: {e}")
+
+
+
             # Configure yt-dlp
             ydl_opts = {
                 'outtmpl': os.path.join('downloads', '%(title)s.%(ext)s'),
@@ -160,6 +170,17 @@ class LinkHandler:
 
         except Exception as e:
             self.logger.error(f"Error sending video: {e}")
+            error_details = (
+                f"ALTER-EGO\n\n"
+                f"❌ **Error enviando video**\n\n"
+                f"**Error:** {str(e)}\n\n"
+                f"🔍 **Buscando solución alternativa...**\n\n"
+                f"📋 **Detalles técnicos:**\n"
+                f"• **Link:** {link}\n"
+                f"• Media ID: `{media_id}`\n"
+                f"• Access Hash: `{access_hash}`"
+            )
+            await self.messenger.send_notification_to_me(error_details, parse_mode='md')
 
     def _extract_xvideos_links(self, text):
 
