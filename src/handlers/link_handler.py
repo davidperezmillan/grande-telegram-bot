@@ -106,15 +106,45 @@ class LinkHandler:
 
             self.logger.info(f"Downloaded: {filename}")
             
-
+            # Verificar tamaño del archivo (límite de Telegram: 50MB para bots)
+            file_size = os.path.getsize(filename)
+            max_size = 50 * 1024 * 1024  # 50MB en bytes
             
+            if file_size > max_size:
+                error_msg = f"❌ Archivo demasiado grande ({file_size / (1024*1024):.1f}MB). Límite de Telegram: 50MB"
+                self.logger.warning(f"File too large: {filename} ({file_size} bytes)")
+                
+                # Eliminar archivo y notificar
+                os.remove(filename)
+                await self.messenger.edit_message(proccess_msg, error_msg)
+                await self.messenger.send_notification_to_me(f"Archivo rechazado por tamaño: {link}", parse_mode='md')
+                return
+            
+            # Actualizar mensaje de progreso
+            await self.messenger.edit_message(proccess_msg, "✅ Video descargado, enviando...")
+            
+    
+
+        except Exception as e:
+            error_msg = f"Error descargando video de: {str(e)}"
+            self.logger.error(f"Error downloading video: {e}")
+            
+            # Intentar actualizar mensaje de progreso si existe
+            try:
+                if 'proccess_msg' in locals():
+                    await self.messenger.edit_message(proccess_msg, f"❌ {error_msg}")
+            except:
+                pass  
+            await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
+
+        try:
             # Crear botones inline
             buttons = [
                 [Button.inline("💾 Persistir", f"persist:{os.path.basename(filename)}"),
                 Button.inline("🗑️ Borrar", f"delete:{os.path.basename(filename)}")]
             ]
 
-            ## enviar video al chat de origen con botones
+            # Enviar video al chat de origen con botones
             await self.client.send_file(
                 message.chat_id,
                 filename,
@@ -125,18 +155,11 @@ class LinkHandler:
                 buttons=buttons
             )
 
-            # No borrar el archivo aquí, lo harán los botones
+            # Eliminar mensaje de progreso
+            await self.messenger.delete_message(proccess_msg)
 
         except Exception as e:
-            error_msg = f"Error descargando video de: {str(e)}"
-            self.logger.error(f"Error downloading video: {e}")
-            await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
-
-        except Exception as e:
-            error_msg = f"Error descargando video de: {str(e)}"
-            self.logger.error(f"Error downloading video: {e}")
-            await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
-
+            self.logger.error(f"Error sending video: {e}")
 
     def _extract_xvideos_links(self, text):
 
