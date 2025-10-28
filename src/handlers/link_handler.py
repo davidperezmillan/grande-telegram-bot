@@ -1,5 +1,6 @@
 import os
 import re
+import urllib.parse
 from telethon import events, Button
 from src.config.logger import setup_logger
 from src.telegram.telegram_messenger import TelegramMessenger
@@ -68,10 +69,7 @@ class LinkHandler:
 
     async def _process_link(self, message, link):
         """Download video from link using yt-dlp."""
-        # Initialize variables to avoid UnboundLocalError
-        media_id = None
-        access_hash = None
-        
+       
         try:
             self.logger.info(f"Processing link: {link}")
             proccess_msg = await self.messenger.send_message(message.chat_id,
@@ -93,16 +91,6 @@ class LinkHandler:
                     await self.messenger.send_notification_to_me(notification, parse_mode='md')
             except Exception as e:
                 self.logger.error(f"Error notifying user: {e}")
-
-            try:
-                # recuperar info del mensaje, media_id	access_hash
-                msg_info = MessageInfo(message)
-                media_id = msg_info.get_media_id()
-                access_hash = msg_info.get_access_hash()
-            except Exception as e:
-                self.logger.error(f"Error retrieving media info: {e}")
-
-
 
             # Configure yt-dlp
             ydl_opts = {
@@ -175,7 +163,7 @@ class LinkHandler:
         except Exception as e:
 
             ## creamos el link
-            video_link = f"https://portal.davidperezmillan.com/grande/download/{os.path.basename(filename)}"
+            video_link = f"http://portal.davidperezmillan.com/grande/downloads/{urllib.parse.quote(os.path.basename(filename))}"
 
             # copiar el archivo a app/www
             self.file_manager.copy_file_to_www(filename)
@@ -189,9 +177,7 @@ class LinkHandler:
                 f"🔍 **Buscando solución alternativa...**\n\n"
                 f"📋 **Detalles técnicos:**\n"
                 f"• **Link original:** {link}\n"
-                f"• **Link descarga:** [{os.path.basename(filename)}]({video_link})\n"
-                f"• Media ID: `{media_id or 'N/A'}`\n"
-                f"• Access Hash: `{access_hash or 'N/A'}`"
+                f"• **Link descarga:** [📥 Descargar archivo]({video_link})\n"
             )
             await self.messenger.send_notification_to_me(error_details, parse_mode='md')
 
