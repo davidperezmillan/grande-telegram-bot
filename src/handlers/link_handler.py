@@ -68,6 +68,10 @@ class LinkHandler:
 
     async def _process_link(self, message, link):
         """Download video from link using yt-dlp."""
+        # Initialize variables to avoid UnboundLocalError
+        media_id = None
+        access_hash = None
+        
         try:
             self.logger.info(f"Processing link: {link}")
             proccess_msg = await self.messenger.send_message(message.chat_id,
@@ -177,8 +181,8 @@ class LinkHandler:
                 f"🔍 **Buscando solución alternativa...**\n\n"
                 f"📋 **Detalles técnicos:**\n"
                 f"• **Link:** {link}\n"
-                f"• Media ID: `{media_id}`\n"
-                f"• Access Hash: `{access_hash}`"
+                f"• Media ID: `{media_id or 'N/A'}`\n"
+                f"• Access Hash: `{access_hash or 'N/A'}`"
             )
             await self.messenger.send_notification_to_me(error_details, parse_mode='md')
 
