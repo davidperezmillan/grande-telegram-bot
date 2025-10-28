@@ -123,6 +123,21 @@ class LinkHandler:
             # Actualizar mensaje de progreso
             await self.messenger.edit_message(proccess_msg, "✅ Video descargado, enviando...")
             
+    
+
+        except Exception as e:
+            error_msg = f"Error descargando video de: {str(e)}"
+            self.logger.error(f"Error downloading video: {e}")
+            
+            # Intentar actualizar mensaje de progreso si existe
+            try:
+                if 'proccess_msg' in locals():
+                    await self.messenger.edit_message(proccess_msg, f"❌ {error_msg}")
+            except:
+                pass  
+            await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
+
+        try:
             # Crear botones inline
             buttons = [
                 [Button.inline("💾 Persistir", f"persist:{os.path.basename(filename)}"),
@@ -144,18 +159,7 @@ class LinkHandler:
             await self.messenger.delete_message(proccess_msg)
 
         except Exception as e:
-            error_msg = f"Error descargando video de: {str(e)}"
-            self.logger.error(f"Error downloading video: {e}")
-            
-            # Intentar actualizar mensaje de progreso si existe
-            try:
-                if 'proccess_msg' in locals():
-                    await self.messenger.edit_message(proccess_msg, f"❌ {error_msg}")
-            except:
-                pass
-                
-            await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
-
+            self.logger.error(f"Error sending video: {e}")
 
     def _extract_xvideos_links(self, text):
 
