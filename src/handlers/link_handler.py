@@ -173,6 +173,14 @@ class LinkHandler:
             await self.messenger.delete_message(proccess_msg)
 
         except Exception as e:
+
+            ## creamos el link
+            video_link = f"https://portal.davidperezmillan.com/grande/download/{os.path.basename(filename)}"
+
+            # copiar el archivo a app/www
+            self.file_manager.copy_file_to_www(filename)
+
+
             self.logger.error(f"Error sending video: {e}")
             error_details = (
                 f"ALTER-EGO\n\n"
@@ -180,7 +188,7 @@ class LinkHandler:
                 f"**Error:** {str(e)}\n\n"
                 f"🔍 **Buscando solución alternativa...**\n\n"
                 f"📋 **Detalles técnicos:**\n"
-                f"• **Link:** {link}\n"
+                f"• **Link:** {video_link}\n"
                 f"• Media ID: `{media_id or 'N/A'}`\n"
                 f"• Access Hash: `{access_hash or 'N/A'}`"
             )

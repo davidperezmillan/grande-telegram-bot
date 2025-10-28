@@ -30,6 +30,26 @@ class FileManager:
             self.logger.error(f"Error persistiendo archivo {filepath}: {e}")
             return False
 
+    def copy_file_to_www(self, filepath):
+        """Copia el archivo a la carpeta www para acceso público."""
+        try:
+            if not os.path.exists(filepath):
+                self.logger.error(f"Archivo no encontrado: {filepath}")
+                return False
+            
+            www_dir = '/app/www'
+            os.makedirs(www_dir, exist_ok=True)
+            filename = os.path.basename(filepath)
+            www_path = os.path.join(www_dir, filename)
+            
+            shutil.copy2(filepath, www_path)
+            self.logger.info(f"Archivo copiado a www: {filepath} -> {www_path}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error copiando archivo a www {filepath}: {e}")
+            return False
+
+
     def delete_file(self, filepath):
         """Elimina el archivo del filesystem."""
         try:
