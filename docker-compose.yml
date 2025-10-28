@@ -12,6 +12,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./downloads:/app/downloads
+      - /home/david/docker/infra/nginx/www/grande/downloads:/app/www
     networks:
       - grande-bot-net
 
