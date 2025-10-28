@@ -188,7 +188,8 @@ class LinkHandler:
                 f"**Error:** {str(e)}\n\n"
                 f"🔍 **Buscando solución alternativa...**\n\n"
                 f"📋 **Detalles técnicos:**\n"
-                f"• **Link:** {video_link}\n"
+                f"• **Link original:** {link}\n"
+                f"• **Link descarga:** [{os.path.basename(filename)}]({video_link})\n"
                 f"• Media ID: `{media_id or 'N/A'}`\n"
                 f"• Access Hash: `{access_hash or 'N/A'}`"
             )
