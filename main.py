@@ -15,8 +15,8 @@ async def main():
     
     config = Config()
     
-    # Ensure the session file can be created
-    session_path = '/app/data/bot.session'
+    # Ensure the session file can be created in data directory
+    session_path = os.path.join('data', 'bot_session')
     client = TelegramClient(session_path, config.api_id, config.api_hash)
     await client.start(bot_token=config.bot_token)
     
