@@ -1,12 +1,11 @@
 import os
 import re
-import urllib.parse
-from telethon import events, Button
+from telethon import events
 from src.config.logger import setup_logger
 from src.telegram.telegram_messenger import TelegramMessenger
 from src.utils.file_manager import FileManager
 from src.database.manager import DatabaseManager
-from src.utils.message_info import MessageInfo
+from src.database.models import Message
 import yt_dlp
 
 class LinkHandler:
@@ -34,33 +33,6 @@ class LinkHandler:
             except Exception as e:
                 self.logger.error(f"Error handling link message: {e}")
 
-        @self.client.on(events.CallbackQuery)
-        async def handle_callback(event):
-            """Handle callback queries from inline buttons."""
-            try:
-                data = event.data.decode('utf-8')
-                if data.startswith('persist:'):
-                    filename = data.split(':', 1)[1]
-                    filepath = os.path.join('downloads', filename)
-                    if self.file_manager.persist_file(filepath):
-                        await event.answer("✅ Archivo persistido correctamente")
-                        await event.edit("", buttons=None)
-                    else:
-                        await event.answer("❌ Error al persistir archivo")
-                elif data.startswith('delete:'):
-                    filename = data.split(':', 1)[1]
-                    filepath = os.path.join('downloads', filename)
-                    if self.file_manager.delete_file(filepath):
-                        await event.answer("🗑️ Archivo eliminado correctamente")
-                        await event.edit("", buttons=None)
-                    else:
-                        await event.answer("❌ Error al eliminar archivo")
-                else:
-                    await event.answer("Acción desconocida")
-            except Exception as e:
-                self.logger.error(f"Error handling callback: {e}")
-                await event.answer("❌ Error procesando acción")
-
 
     def _extract_all_links(self, text):
         """Extract all URLs from text."""
@@ -69,28 +41,9 @@ class LinkHandler:
 
     async def _process_link(self, message, link):
         """Download video from link using yt-dlp."""
-       
         try:
             self.logger.info(f"Processing link: {link}")
-            proccess_msg = await self.messenger.send_message(message.chat_id,
-                f"Descargando video de: {link}", parse_mode='md')
-
-            try:
-                if (self.config.user_id != message.chat_id):
-                    # Obtener información del usuario que solicita
-                    msg_info = MessageInfo(message)
-                    sender = msg_info.get_sender_info()
-                    user_info = f"👤 Usuario: {sender['first_name'] or 'Unknown'}"
-                    if sender['username']:
-                        user_info += f" (@{sender['username']})"
-                    user_info += f" - ID: `{sender['id']}`"
-                    user_info += f"\n📍 Chat: `{msg_info.get_chat_id()}` ({msg_info.get_chat_type()})"
-                    
-                    # Notificar al usuario
-                    notification = f"🎥 **Nueva descarga solicitada**\n\n{user_info}\n\n🔗 Link: {link}"
-                    await self.messenger.send_notification_to_me(notification, parse_mode='md')
-            except Exception as e:
-                self.logger.error(f"Error notifying user: {e}")
+            proccess_msg = await self.messenger.send_notification_to_me(f"Descargando video de: {link}", parse_mode='md')
 
             # Configure yt-dlp
             ydl_opts = {
@@ -108,78 +61,48 @@ class LinkHandler:
 
             self.logger.info(f"Downloaded: {filename}")
             
-            # Verificar tamaño del archivo (límite de Telegram: 50MB para bots)
-            file_size = os.path.getsize(filename)
-            max_size = 50 * 1024 * 1024  # 50MB en bytes
-            
-            if file_size > max_size:
-                error_msg = f"❌ Archivo demasiado grande ({file_size / (1024*1024):.1f}MB). Límite de Telegram: 50MB"
-                self.logger.warning(f"File too large: {filename} ({file_size} bytes)")
-                
-                # Eliminar archivo y notificar
-                os.remove(filename)
-                await self.messenger.edit_message(proccess_msg, error_msg)
-                await self.messenger.send_notification_to_me(f"Archivo rechazado por tamaño: {link}", parse_mode='md')
-                return
-            
-            # Actualizar mensaje de progreso
-            await self.messenger.edit_message(proccess_msg, "✅ Video descargado, enviando...")
-            
-    
+          
+            # Cambiar permisos y propietario para asegurar acceso
+            try:
+                uid = os.getuid()
+                gid = os.getgid()
+                os.chmod(filename, 0o644)
+                os.chown(filename, uid, gid)
+                self.logger.info(f"Permisos y propietario cambiados para {filename}: uid={uid}, gid={gid}")
+            except Exception as perm_err:
+                self.logger.warning(f"No se pudo cambiar permisos/propietario de {filename}: {perm_err}")
+
+
+
+            ## editar proccess_msg
+            await self.messenger.delete_message(message.id, chat_id=message.chat_id)
+            await self.messenger.delete_message(proccess_msg.id, chat_id=proccess_msg.chat_id)
+            proccess_msg = await self.messenger.send_notification_to_me(f"Video descargado: {filename}", parse_mode='md')
+
+            ## enviar video al chat de origen
+            await self.client.send_file(
+                message.chat_id,
+                filename,
+                caption=f"Video descargado de:\n{link}",
+                parse_mode='markdown',
+                supports_streaming=True,
+                spoiler=True
+            )
+            # borrar proccess_msg
+            await self.messenger.delete_message(proccess_msg)
+
+            ## borrar archivo descargado
+            os.remove(filename)
+            self.logger.info(f"Archivo {filename} eliminado después de enviar.")
+
+            # Optionally, process like a video
+            # But for now, just download
 
         except Exception as e:
             error_msg = f"Error descargando video de: {str(e)}"
             self.logger.error(f"Error downloading video: {e}")
-            
-            # Intentar actualizar mensaje de progreso si existe
-            try:
-                if 'proccess_msg' in locals():
-                    await self.messenger.edit_message(proccess_msg, f"❌ {error_msg}")
-            except:
-                pass  
             await self.messenger.send_notification_to_me(error_msg, parse_mode='md')
 
-        try:
-            # Crear botones inline
-            buttons = [
-                [Button.inline("💾 Persistir", f"persist:{os.path.basename(filename)}"),
-                Button.inline("🗑️ Borrar", f"delete:{os.path.basename(filename)}")]
-            ]
-
-            # Enviar video al chat de origen con botones
-            await self.client.send_file(
-                message.chat_id,
-                filename,
-                caption=f"Video descargado de:\n{link}\n\nElige qué hacer con el archivo:",
-                parse_mode='markdown',
-                supports_streaming=True,
-                spoiler=True,
-                buttons=buttons
-            )
-
-            # Eliminar mensaje de progreso
-            await self.messenger.delete_message(proccess_msg)
-
-        except Exception as e:
-
-            ## creamos el link
-            video_link = f"http://portal.davidperezmillan.com/grande/downloads/{urllib.parse.quote(os.path.basename(filename))}"
-
-            # copiar el archivo a app/www
-            self.file_manager.copy_file_to_www(filename)
-
-
-            self.logger.error(f"Error sending video: {e}")
-            error_details = (
-                f"ALTER-EGO\n\n"
-                f"❌ **Error enviando video**\n\n"
-                f"**Error:** {str(e)}\n\n"
-                f"🔍 **Buscando solución alternativa...**\n\n"
-                f"📋 **Detalles técnicos:**\n"
-                f"• **Link original:** {link}\n"
-                f"• **Link descarga:** [📥 Descargar archivo]({video_link})\n"
-            )
-            await self.messenger.send_notification_to_me(error_details, parse_mode='md')
 
     def _extract_xvideos_links(self, text):
 
